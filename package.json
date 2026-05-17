@@ -1,0 +1,20 @@
+{
+  "name": "volaris",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Volaris monorepo: high-performance disk analyzer.",
+  "type": "module",
+  "scripts": {
+    "start": "pnpm --filter @volaris/cli start",
+    "scan:d": "pnpm --filter @volaris/cli scan:d",
+    "scan:json": "pnpm --filter @volaris/cli scan:json",
+    "scan:csv": "pnpm --filter @volaris/cli scan:csv",
+    "dev:cli": "pnpm --filter @volaris/cli start",
+    "link:cli": "cd packages/cli && pnpm link --global",
+    "pack:cli": "cd packages/cli && pnpm pack"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "packageManager": "pnpm@10.8.1"
+}

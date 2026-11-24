@@ -28,7 +28,7 @@ volaris/
 | `@volaris/core` | 扫描核心、Worker 线程池、任务分发 |
 | `@volaris/cli` | 命令行入口 |
 | `@volaris/native` | C++ Node-API 插件，读取 NTFS MFT 并统计目录大小 |
-| `@volaris/app` | 第四阶段预留：Electron / Tauri GUI |
+| `@volaris/app` | Windows 桌面端，提供空间分布图、目录排名和扫描进度 |
 
 ## 安装
 
@@ -37,6 +37,14 @@ pnpm install
 ```
 
 ## 运行
+
+在 Windows 上启动桌面开发版，选择目录后点击「开始扫描」。点击空间分布图或排名行可以查看对应目录。Windows x64 安装包构建步骤见[桌面端说明](packages/app/README.md)。
+
+```powershell
+pnpm app:dev
+```
+
+运行 CLI 使用以下命令。
 
 ```bash
 pnpm start
@@ -112,12 +120,4 @@ pnpm --filter @volaris/native test
 
 第三阶段后续会在相同 NTFS 卷上对照两种引擎的耗时、总字节数和文件数，以接近 WizTree / Everything 的扫描速度为优化目标。
 
-### 第四阶段：`@volaris/app`
-
-基于 Electron 或 Tauri 做 GUI：
-
-- TreeMap
-- 目录树
-- 最大文件分析
-- 清理建议
-- 实时监控
+桌面端首版已提供同层目录的 TreeMap 与排名。后续功能包括多层目录树、最大文件分析、清理建议与实时监控。

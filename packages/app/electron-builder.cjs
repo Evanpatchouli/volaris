@@ -2,6 +2,7 @@ const { access } = require("node:fs/promises");
 const path = require("node:path");
 
 const addon = "cpp/build/Release/volaris_ntfs.node";
+const signing = Boolean(process.env.VOLARIS_SIGN_PFX);
 const scannerPackages = ["core", "shared", "native"].map((name) => ({
   from: `../${name}`,
   to: `scanner/node_modules/@volaris/${name}`,
@@ -18,7 +19,11 @@ module.exports = {
     { from: "src/main/scan-process.mjs", to: "scanner/scan-process.mjs" },
     ...scannerPackages,
   ],
-  beforePack: async () => {
+  beforePack: async ({ targets }) => {
+    if (!signing && targets.some(target => target.name === "nsis")) {
+      throw new Error("Set VOLARIS_SIGN_PFX to sign the installer, or use pnpm app:dist:dev for a local development signature.");
+    }
+    if (signing) await access(process.env.VOLARIS_SIGN_PFX);
     try {
       await access(path.join(__dirname, "../native", addon));
     } catch (cause) {
@@ -27,7 +32,16 @@ module.exports = {
   },
   npmRebuild: false,
   electronDist: path.dirname(require("electron")),
-  win: { target: "nsis" },
+  forceCodeSigning: signing,
+  win: {
+    target: "nsis",
+    signExecutable: signing,
+    signExts: [".node"],
+    signtoolOptions: {
+      sign: require("./scripts/sign-windows.cjs"),
+      signingHashAlgorithms: ["sha256"],
+    },
+  },
   nsis: {
     oneClick: false,
     allowToChangeInstallationDirectory: true,

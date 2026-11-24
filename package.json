@@ -9,6 +9,7 @@
     "app:build": "pnpm --filter @volaris/app run build",
     "app:pack": "pnpm --filter @volaris/app run pack",
     "app:dist": "pnpm --filter @volaris/app run dist",
+    "app:dist:dev": "pwsh -NoProfile -File packages/app/scripts/build-dev-signed.ps1",
     "build:native": "pnpm --filter @volaris/native build",
     "test": "node --test",
     "start": "pnpm --filter @volaris/cli start",

@@ -20,6 +20,8 @@ export interface DirectoryResult {
 
 export interface ScanReport {
   results: DirectoryResult[];
+  largestFiles?: Array<{ path: string; name: string; size: number }>;
+  largestFileReadErrors?: number;
   summary: {
     root: string;
     engine: ActiveEngine;

@@ -33,19 +33,34 @@ Napi::Array js_tree(Napi::Env env, const std::vector<volaris::TreeNode>& nodes) 
     return tree;
 }
 
+Napi::Array js_files(Napi::Env env, const std::vector<volaris::LargeFile>& files) {
+    auto array = Napi::Array::New(env, files.size());
+    for (size_t i = 0; i < files.size(); ++i) {
+        Napi::HandleScope scope(env);
+        const auto& file = files[i];
+        auto item = Napi::Object::New(env);
+        item.Set("path", js_string(env, file.path));
+        item.Set("name", js_string(env, file.name));
+        item.Set("size", Napi::Number::New(env, static_cast<double>(file.size)));
+        array.Set(static_cast<uint32_t>(i), item);
+    }
+    return array;
+}
+
 class ScanWorker final : public Napi::AsyncWorker {
 public:
     ScanWorker(Napi::Env env, std::wstring root, unsigned depth, std::vector<std::wstring> rules,
-               bool include_tree)
+               bool include_tree, unsigned largest_files_limit)
         : Napi::AsyncWorker(env, "volaris:ntfs"), deferred_(Napi::Promise::Deferred::New(env)),
-          root_(std::move(root)), depth_(depth), rules_(std::move(rules)), include_tree_(include_tree) {}
+          root_(std::move(root)), depth_(depth), rules_(std::move(rules)), include_tree_(include_tree),
+          largest_files_limit_(largest_files_limit) {}
 
     Napi::Promise promise() const { return deferred_.Promise(); }
 
 private:
     void Execute() override {
         try {
-            rows_ = volaris::scan(root_, depth_, rules_, include_tree_);
+            rows_ = volaris::scan(root_, depth_, rules_, include_tree_, largest_files_limit_);
         } catch (const volaris::ScanError& e) {
             error_code_ = e.code;
             SetError(e.what());
@@ -72,6 +87,7 @@ private:
             item.Set("errorCount", Napi::Number::New(env, static_cast<double>(row.errorCount)));
             item.Set("skippedCount", Napi::Number::New(env, static_cast<double>(row.skippedCount)));
             if (include_tree_) item.Set("tree", js_tree(env, row.tree));
+            if (largest_files_limit_) item.Set("largestFiles", js_files(env, row.largest_files));
             results.Set(static_cast<uint32_t>(i), item);
         }
         deferred_.Resolve(results);
@@ -82,6 +98,7 @@ private:
     unsigned depth_;
     std::vector<std::wstring> rules_;
     bool include_tree_;
+    unsigned largest_files_limit_;
     std::vector<volaris::Result> rows_;
     std::string error_code_ = "ERR_NTFS_SCAN";
 };
@@ -93,9 +110,11 @@ Napi::Value start_scan(const Napi::CallbackInfo& info) {
         ignore_rules.push_back(wide_string(rules.Get(i)));
     }
     const bool include_tree = info.Length() > 3 && info[3].As<Napi::Boolean>().Value();
+    const auto limit = info.Length() > 4 ? info[4].As<Napi::Number>().Uint32Value() : 0;
+    if (limit > 1000) throw Napi::RangeError::New(info.Env(), "largestFilesLimit exceeds 1000");
     auto worker = std::make_unique<ScanWorker>(
         info.Env(), wide_string(info[0]), info[1].As<Napi::Number>().Uint32Value(),
-        std::move(ignore_rules), include_tree);
+        std::move(ignore_rules), include_tree, limit);
     auto promise = worker->promise();
     worker->Queue();
     worker.release();  // AsyncWorker owns its lifetime once queued.
@@ -105,6 +124,7 @@ Napi::Value start_scan(const Napi::CallbackInfo& info) {
 Napi::Object init(Napi::Env env, Napi::Object exports) {
     exports.Set("scan", Napi::Function::New(env, start_scan));
     exports.Set("supportsTree", true);
+    exports.Set("supportsLargestFiles", true);
     return exports;
 }
 

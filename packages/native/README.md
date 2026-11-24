@@ -4,6 +4,8 @@
 
 传入 `includeTree: true` 可在每个目标的结果中取得 `tree` 数组。每个节点的 `name` 是目录名，`size` 是该目录及其后代的逻辑字节数，`parent` 是父节点的数组下标。下标 0 表示目标目录，其 `parent` 为 -1。空目录和无法读取的目录也会出现在树中。插件在同一次扫描中计算这些数据，默认省略 `tree`。旧版插件收到目录树请求时会返回 `ERR_NTFS_UNAVAILABLE`，可重新构建插件以启用此选项。
 
+传入 `largestFilesLimit` 可列出目标目录范围内最大的文件，取值为 0 至 1000 的整数。默认值 0 关闭排名。启用后，所有目标合计最多保留指定数量的文件，各目标通过 `largestFiles` 返回属于自己的条目，包含 `path`、`name` 和逻辑字节数 `size`。文件按大小降序排列，同大小按完整路径的 UTF-16 码元升序排列。排名可与 `includeTree` 同时使用。
+
 ## 构建与测试
 
 在仓库根目录运行下列命令。构建使用 Python 3、Visual Studio 的“使用 C++ 的桌面开发”工作负载和 Windows SDK。插件按当前 Node.js 架构编译。常规安装只准备依赖。[node-gyp 的 Windows 构建要求](https://github.com/nodejs/node-gyp#on-windows)

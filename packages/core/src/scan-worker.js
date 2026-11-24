@@ -2,6 +2,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { parentPort, workerData } from "node:worker_threads";
 import { shouldIgnore } from "@volaris/shared";
+import { LargestFiles } from "./largest-files.js";
 
 const ignoreRules = workerData.ignoreRules ?? [];
 
@@ -14,6 +15,7 @@ async function scanDirectory(root) {
 
   const name = path.basename(root);
   const tree = workerData.includeTree ? [{ parent: -1, name, size: 0 }] : null;
+  const largest = workerData.largestFilesLimit ? new LargestFiles(workerData.largestFilesLimit) : null;
   const nodeStack = tree ? [0] : null;
   const stack = [root];
 
@@ -59,6 +61,7 @@ async function scanDirectory(root) {
           const stat = await fs.stat(fullPath);
           totalSize += stat.size;
           fileCount++;
+          largest?.add(fullPath, entry.name, stat.size);
           continue;
         }
 
@@ -87,6 +90,7 @@ async function scanDirectory(root) {
     }
     result.tree = tree;
   }
+  if (largest) result.largestFiles = largest.sorted();
   return result;
 }
 

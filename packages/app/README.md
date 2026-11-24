@@ -19,6 +19,8 @@ pnpm app:dev
 
 分析结果中的「目录树」支持逐层展开。每行显示该目录及其后代的逻辑大小。目录树来自本次扫描的快照，展开时可立即查看子目录。
 
+「最大文件」按逻辑大小列出扫描根中的前 100 个文件，包含根目录直属文件。硬链接按路径列出，点选完整路径文本可复制。
+
 ## 构建 Windows x64 安装包
 
 Windows x64 打包使用 Python、Visual Studio C++ 工具链和基于 OpenSSL 的 `osslsigncode`。将 `osslsigncode.exe` 加入 PATH，或在 `VOLARIS_OSSLSIGNCODE` 中指定可执行文件的绝对路径。本项目使用 osslsigncode 2.16 验证签名流程。[原生插件构建说明](../native/README.md) · [osslsigncode 官方发行包](https://github.com/mtrojnar/osslsigncode/releases)

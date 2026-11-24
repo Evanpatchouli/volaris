@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 import { performance } from "node:perf_hooks";
 import { WorkerPool } from "./worker-pool.js";
 import { runEngine } from "./engine.js";
+import { LargestFiles } from "./largest-files.js";
 import { shouldIgnore, formatBytes, formatDuration } from "@volaris/shared";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -18,27 +19,17 @@ function normalizeDepth(value) {
   return depth;
 }
 
-export async function collectTargets(root, targetDepth, ignoreRules) {
+async function visitTargets(root, targetDepth, ignoreRules, onTarget, ranking) {
   const normalizedDepth = normalizeDepth(targetDepth);
-  if (normalizedDepth === 1) {
-    const entries = await fs.readdir(root, { withFileTypes: true });
-
-    return entries
-      .filter((entry) => entry.isDirectory())
-      .map((entry) => path.join(root, entry.name))
-      .filter((item) => !shouldIgnore(item, ignoreRules));
-  }
-
-  const results = [];
   const stack = [{ dir: root, depth: 0 }];
 
   while (stack.length > 0) {
     const item = stack.pop();
 
-    if (shouldIgnore(item.dir, ignoreRules)) continue;
+    if (normalizedDepth > 1 && shouldIgnore(item.dir, ignoreRules)) continue;
 
     if (item.depth === normalizedDepth) {
-      results.push(item.dir);
+      onTarget(item.dir);
       continue;
     }
 
@@ -46,21 +37,45 @@ export async function collectTargets(root, targetDepth, ignoreRules) {
 
     try {
       entries = await fs.readdir(item.dir, { withFileTypes: true });
-    } catch {
+    } catch (error) {
+      if (normalizedDepth === 1 && onTarget) throw error;
+      if (ranking) ranking.readErrors++;
       continue;
     }
 
     for (const entry of entries) {
-      if (!entry.isDirectory()) continue;
-
-      stack.push({
-        dir: path.join(item.dir, entry.name),
-        depth: item.depth + 1,
-      });
+      if (entry.isDirectory()) {
+        if (!onTarget && item.depth + 1 === normalizedDepth) continue;
+        const dir = path.join(item.dir, entry.name);
+        if (normalizedDepth === 1) {
+          if (!shouldIgnore(dir, ignoreRules)) onTarget(dir);
+        } else {
+          stack.push({ dir, depth: item.depth + 1 });
+        }
+      } else if (ranking && entry.isFile()) {
+        const file = path.join(item.dir, entry.name);
+        if (shouldIgnore(file, ignoreRules)) continue;
+        try {
+          const stat = await fs.lstat(file);
+          if (stat.isFile()) ranking.files.add(file, entry.name, stat.size);
+        } catch {
+          ranking.readErrors++;
+        }
+      }
     }
   }
+}
 
+export async function collectTargets(root, targetDepth, ignoreRules, ranking) {
+  const results = [];
+  await visitTargets(root, targetDepth, ignoreRules, (target) => results.push(target), ranking);
   return results;
+}
+
+function mergeTargetFiles(result, ranking) {
+  for (const file of result.largestFiles) ranking.files.add(file.path, file.name, file.size);
+  delete result.largestFiles;
+  ranking.readErrors += result.errorCount;
 }
 
 function getCpuUsagePercent(startCpuUsage, durationMs) {
@@ -106,7 +121,7 @@ async function scanWorkerTargets(options) {
     throw new RangeError("workers must be a positive integer.");
   }
 
-  const targets = await collectTargets(root, depth, ignoreRules);
+  const targets = await collectTargets(root, depth, ignoreRules, options.ranking);
 
   const metrics = {
     completedTargets: 0,
@@ -121,7 +136,9 @@ async function scanWorkerTargets(options) {
 
   const pool = new WorkerPool(workerFile, {
     size: workers,
-    workerData: { ignoreRules, includeTree: options.includeTree === true },
+    workerData: {
+      ignoreRules, includeTree: options.includeTree === true, largestFilesLimit: options.largestFilesLimit,
+    },
     onStateChange(state) {
       metrics.busyWorkers = state.busyWorkers;
       metrics.idleWorkers = state.idleWorkers;
@@ -142,6 +159,7 @@ async function scanWorkerTargets(options) {
   try {
     const tasks = targets.map(async (target) => {
       const result = await pool.run({ path: target });
+      if (options.ranking) mergeTargetFiles(result, options.ranking);
 
       results.push(result);
 
@@ -164,18 +182,30 @@ async function scanWorkerTargets(options) {
   return results;
 }
 
-async function scanNativeTargets({ root, depth, ignoreRules, includeTree }) {
+async function scanNativeTargets({ root, depth, ignoreRules = [], includeTree, largestFilesLimit, ranking }) {
   const { scanNtfsMft } = await import("@volaris/native");
-  return scanNtfsMft({ root, depth: normalizeDepth(depth), ignoreRules, includeTree: includeTree === true });
+  const rows = await scanNtfsMft({
+    root, depth: normalizeDepth(depth), ignoreRules, includeTree: includeTree === true, largestFilesLimit,
+  });
+  if (ranking) {
+    for (const row of rows) mergeTargetFiles(row, ranking);
+    // The NTFS engine returns target subtrees. Add only files above that depth.
+    await visitTargets(root, depth, ignoreRules, null, ranking);
+  }
+  return rows;
 }
 
 export async function scan(options) {
-  const { root } = options;
+  const { root, largestFilesLimit = 0 } = options;
+  if (!Number.isInteger(largestFilesLimit) || largestFilesLimit < 0 || largestFilesLimit > 1000) {
+    throw new RangeError("largestFilesLimit must be an integer from 0 to 1000.");
+  }
+  const ranking = largestFilesLimit ? { files: new LargestFiles(largestFilesLimit), readErrors: 0 } : null;
   const workers = Number(options.workers ?? Math.min(os.cpus().length, 8));
   const startedAt = performance.mark("volaris-scan-start").startTime;
   const startedCpuUsage = process.cpuUsage();
   const { results, engine, fallbackReason } = await runEngine(
-    { ...options, workers }, scanNativeTargets, scanWorkerTargets,
+    { ...options, workers, largestFilesLimit, ranking }, scanNativeTargets, scanWorkerTargets,
   );
   const finishedAt = performance.mark("volaris-scan-end").startTime;
   performance.measure("volaris-scan-total", { start: startedAt, end: finishedAt });
@@ -212,10 +242,12 @@ export async function scan(options) {
     cpuPercent: cpu.percent,
   };
 
-  return {
-    results,
-    summary,
-  };
+  const report = { results, summary };
+  if (ranking) {
+    report.largestFiles = ranking.files.sorted();
+    report.largestFileReadErrors = ranking.readErrors;
+  }
+  return report;
 }
 
 export function scanWithWorkers(options) {

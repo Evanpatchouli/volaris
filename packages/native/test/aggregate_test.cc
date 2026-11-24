@@ -89,6 +89,7 @@ int main() {
   assert(alpha.errorCount == 2 && alpha.skippedCount == 7);
   assert(lookup(rows, L"empty").dirCount == 1);
   assert(alpha.tree.empty() && lookup(rows, L"empty").tree.empty());
+  assert(alpha.largest_files.empty() && lookup(rows, L"empty").largest_files.empty());
   assert(opened.size() == 5);
   const std::set<std::wstring> expected_files{alpha_path + L"\\file", alpha_path + L"\\hard-link",
                                               alpha_path + L"\\vanished", alpha_path + L"\\sub\\.github"};
@@ -138,6 +139,35 @@ int main() {
   const auto& empty = lookup(rows, L"empty");
   assert(empty.tree.size() == 1 && empty.tree[0].parent == -1 && empty.tree[0].size == 0);
   assert(files_queried.size() == expected_files.size() + 1);
+
+  // A single limit covers every target. The earlier UTF-16 path displaces
+  // an equal-sized file even if traversal visited the other target first.
+  const auto other_path = root + L"\\empty";
+  listings[other_path] = {{L"tie", 0}, {L"leader", 0}, {L"zero", 0}};
+  sizes[other_path + L"\\tie"] = large_size;
+  sizes[other_path + L"\\leader"] = large_size + 1;
+  sizes[other_path + L"\\zero"] = 0;
+  opened.clear();
+  files_queried.clear();
+  rows = scan(root, 1, rules, true, 2);
+  const auto& ranked_alpha = lookup(rows, L"alpha");
+  const auto& ranked_other = lookup(rows, L"empty");
+  assert(ranked_alpha.tree[0].size == ranked_alpha.size);
+  assert(ranked_alpha.largest_files.size() == 1 && ranked_other.largest_files.size() == 1);
+  assert(ranked_alpha.largest_files[0].path == alpha_path + L"\\file");
+  assert(ranked_other.largest_files[0].name == L"leader" && ranked_other.largest_files[0].size == large_size + 1);
+  assert(files_queried.size() == expected_files.size() + 4);
+
+  opened.clear();
+  files_queried.clear();
+  rows = scan(root, 1, rules, false, 1000);
+  const auto& alpha_files = lookup(rows, L"alpha").largest_files;
+  assert(alpha_files.size() == 4 && alpha_files[0].name == L"file" && alpha_files[1].name == L"hard-link");
+  assert(alpha_files[0].size == large_size && alpha_files[1].size == large_size);
+  assert(alpha_files[2].path == alpha_path + L"\\sub\\nested\\payload" && alpha_files[3].name == L".github");
+  const auto& other_files = lookup(rows, L"empty").largest_files;
+  assert(other_files.size() == 3 && other_files.back().name == L"zero" && other_files.back().size == 0);
+  assert(lookup(rows, L"empty").tree.empty());
 
   // A non-drive-root scan whose supplied absolute path already exceeds MAX_PATH.
   std::wstring long_root = L"D:\\";

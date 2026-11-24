@@ -26,6 +26,7 @@ port.once("message", async ({ data: { root, engine } }) => {
       engine,
       ignoreRules,
       includeTree: true,
+      largestFilesLimit: 100,
       onProgress(event) {
         if (event.type === "native-start") {
           publishProgress("native");

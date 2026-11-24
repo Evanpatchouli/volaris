@@ -7,7 +7,9 @@ function unavailable(message, cause) {
   return Object.assign(new Error(message, { cause }), { code: "ERR_NTFS_UNAVAILABLE" });
 }
 
-export async function scanNtfsMft({ root, depth = 1, ignoreRules = [], includeTree = false }) {
+export async function scanNtfsMft({
+  root, depth = 1, ignoreRules = [], includeTree = false, largestFilesLimit = 0,
+}) {
   if (typeof root !== "string" || !root || root.includes("\0")) {
     throw new TypeError("root must be a non-empty directory path");
   }
@@ -19,6 +21,9 @@ export async function scanNtfsMft({ root, depth = 1, ignoreRules = [], includeTr
   }
   if (typeof includeTree !== "boolean") {
     throw new TypeError("includeTree must be a boolean");
+  }
+  if (!Number.isInteger(largestFilesLimit) || largestFilesLimit < 0 || largestFilesLimit > 1000) {
+    throw new RangeError("largestFilesLimit must be an integer from 0 to 1000");
   }
   if (process.platform !== "win32") {
     throw unavailable("The native NTFS scanner requires Windows");
@@ -35,9 +40,15 @@ export async function scanNtfsMft({ root, depth = 1, ignoreRules = [], includeTr
     if (error.code !== "MODULE_NOT_FOUND" && error.code !== "ERR_DLOPEN_FAILED") throw error;
     throw unavailable("Cannot load the native NTFS addon. Run pnpm build:native on Windows.", error);
   }
-  if (!includeTree) return binding.scan(resolved, depth, ignoreRules);
-  if (binding.supportsTree !== true) {
+  if (includeTree && binding.supportsTree !== true) {
     throw unavailable("This NTFS addon cannot return a directory tree. Run pnpm build:native to update it.");
   }
-  return binding.scan(resolved, depth, ignoreRules, true);
+  if (largestFilesLimit) {
+    if (binding.supportsLargestFiles !== true) {
+      throw unavailable("This NTFS addon cannot rank files. Run pnpm build:native to update it.");
+    }
+    return binding.scan(resolved, depth, ignoreRules, includeTree, largestFilesLimit);
+  }
+  if (includeTree) return binding.scan(resolved, depth, ignoreRules, true);
+  return binding.scan(resolved, depth, ignoreRules);
 }

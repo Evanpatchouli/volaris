@@ -87,10 +87,32 @@ struct Pending {
   size_t tree_node = 0;
 };
 
+struct RankedFile {
+  size_t owner;
+  std::wstring path;
+  uint64_t size;
+};
+
+bool ranks_before(const RankedFile& a, const RankedFile& b) {
+  return a.size != b.size ? a.size > b.size : a.path < b.path;
+}
+
+void retain_file(std::vector<RankedFile>& heap, unsigned limit, RankedFile file) {
+  if (heap.size() == limit) {
+    // The lowest-ranked retained file is at the front.
+    if (!ranks_before(file, heap.front())) return;
+    std::pop_heap(heap.begin(), heap.end(), ranks_before);
+    heap.pop_back();
+  }
+  heap.push_back(std::move(file));
+  std::push_heap(heap.begin(), heap.end(), ranks_before);
+}
+
 }  // namespace
 
 std::vector<Result> scan(const std::wstring& root, unsigned depth,
-                         const std::vector<std::wstring>& ignore_rules, bool include_tree) {
+                         const std::vector<std::wstring>& ignore_rules, bool include_tree,
+                         unsigned largest_files_limit) {
   const auto volume = index_volume(root);
   const IgnoreRules ignore(ignore_rules);
   if (ignore.matches_root(root)) return {};
@@ -102,6 +124,7 @@ std::vector<Result> scan(const std::wstring& root, unsigned depth,
   }
 
   std::vector<Result> results;
+  std::vector<RankedFile> largest;
   std::vector<Pending> stack{{volume.root_id, root, 0, std::nullopt}};
   std::unordered_set<uint64_t> visited{volume.root_id};
   const Children empty;
@@ -141,6 +164,9 @@ std::vector<Result> scan(const std::wstring& root, unsigned depth,
         if (read_file_size(path, bytes)) {
           ++target->fileCount;
           direct_bytes += bytes;
+          if (largest_files_limit) {
+            retain_file(largest, largest_files_limit, {*current.target, std::move(path), bytes});
+          }
         } else {
           ++target->errorCount;
         }
@@ -182,6 +208,11 @@ std::vector<Result> scan(const std::wstring& root, unsigned depth,
         row.tree[static_cast<size_t>(node.parent)].size += node.size;
       }
     }
+  }
+  std::sort_heap(largest.begin(), largest.end(), ranks_before);
+  for (auto& file : largest) {
+    auto name = file.path.substr(file.path.find_last_of(L"\\/") + 1);
+    results[file.owner].largest_files.push_back({std::move(file.path), std::move(name), file.size});
   }
   return results;
 }

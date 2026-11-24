@@ -12,6 +12,7 @@ async function checkScanner(unpacked, fixture) {
   const scanner = path.join(unpacked, "resources", "scanner");
   const entry = path.join(scanner, "scan-process.mjs");
   await access(entry);
+  await access(path.join(scanner, "watch-process.mjs"));
   const require = createRequire(entry);
   const packages = await realpath(path.join(scanner, "node_modules", "@volaris"));
   // An unpacked build inside the repository can otherwise resolve workspace dependencies.
@@ -21,15 +22,22 @@ async function checkScanner(unpacked, fixture) {
   }
   const addon = require(path.join(packages, "native/cpp/build/Release/volaris_ntfs.node"));
   assert.equal(typeof addon.scan, "function");
+  assert.equal(addon.supportsTree, true);
+  assert.equal(addon.supportsLargestFiles, true);
 
-  const { scan } = await import(pathToFileURL(require.resolve("@volaris/core")).href);
-  const { results, summary } = await scan({ root: fixture, engine: "workers", workers: 1 });
+  const { scan, getCleanupSuggestions, watchDirectory } = await import(pathToFileURL(require.resolve("@volaris/core")).href);
+  assert.equal(typeof watchDirectory, "function");
+  const report = await scan({ root: fixture, engine: "workers", workers: 1, includeTree: true, largestFilesLimit: 1 });
+  const { results, summary } = report;
   assert.equal(summary.engine, "workers");
   assert.equal(results.length, 1);
   assert.equal(results[0].name, "样本");
   assert.equal(summary.fileCount, 2);
   assert.equal(summary.totalSizeBytes, 7);
   assert.equal(summary.errorCount, 0);
+  assert.deepEqual(results[0].tree, [{ parent: -1, name: "样本", size: 7 }]);
+  assert.equal(report.largestFiles[0].name, "second");
+  assert.deepEqual(getCleanupSuggestions(report), []);
   console.log(success);
 }
 

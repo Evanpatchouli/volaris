@@ -6,7 +6,9 @@ import { AppBar } from "./AppBar";
 import { Tooltip } from "./Tooltip";
 import { EnginePicker } from "./EnginePicker";
 import { engineName, explainError, formatCount } from "./presentation";
-import { Metrics, Results } from "./Results";
+import { Metrics, Results, type ResultView } from "./Results";
+import { Monitor } from "./Monitor";
+import { useMonitor } from "./useMonitor";
 import { useScan } from "./useScan";
 
 const control = "inline-flex min-h-10 shrink-0 cursor-pointer items-center justify-center gap-2 rounded-lg px-4 text-[15px] font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-default disabled:opacity-50 motion-reduce:transition-none xl:min-h-12 xl:px-5 xl:text-lg";
@@ -44,8 +46,11 @@ function Scanning({ progress }: { progress?: ScanProgress }) {
 
 export function App() {
   const { root, engine, setEngine, state, choosing, cancelling, choose, start, cancel } = useScan();
+  const monitor = useMonitor(root);
+  const [view, setView] = useState<ResultView | "monitor">("overview");
   const running = state.phase === "running";
   const completed = state.phase === "complete";
+  const visibleView = view === "monitor" || completed ? view : "overview";
   const progress = running ? state.progress : undefined;
   const summary = completed ? state.report.summary : undefined;
   const actual = summary?.engine ?? progress?.engine;
@@ -69,11 +74,18 @@ export function App() {
         <div className="flex flex-wrap items-center gap-2">
           {root && <button type="button" className={secondary} disabled={running || choosing} onClick={choose}><Folder size={16}/>选择目录</button>}
           <EnginePicker value={engine} disabled={running || choosing} onChange={setEngine} className={secondary}/>
-          {completed && <button type="button" onClick={start} disabled={choosing} className={primary}><Play aria-hidden size={15} fill="currentColor"/>开始扫描</button>}
+          {!running && (completed || (root && visibleView === "monitor")) && <button type="button" onClick={start} disabled={choosing} className={primary}><Play aria-hidden size={15} fill="currentColor"/>{visibleView === "monitor" ? "刷新分析" : "开始扫描"}</button>}
           {running && <button type="button" onClick={cancel} disabled={cancelling} className={secondary}><Square size={13}/>{cancelling ? "正在取消" : "取消扫描"}</button>}
         </div>
       </div>
-      {completed ? <Results report={state.report}/> : running ? <Scanning progress={progress}/> :
+      {summary && <Metrics size={summary.totalSizeBytes} files={summary.fileCount} dirs={summary.dirCount} duration={summary.durationMs}/>}
+      {root && <nav aria-label="分析视图" className="flex shrink-0 flex-wrap gap-1 self-start rounded-lg border border-edge bg-white p-1">
+        {([["overview", "空间概览"], ["tree", "目录树"], ["files", "最大文件"], ["cleanup", "清理建议"], ["monitor", "实时监控"]] as const)
+          .filter(([id]) => completed || id === "overview" || id === "monitor").map(([id, label]) =>
+          <button key={id} type="button" aria-pressed={visibleView === id} onClick={() => setView(id)} className="cursor-pointer rounded-md px-4 py-1.5 text-sm font-medium text-muted hover:bg-workspace focus-visible:outline-accent aria-pressed:bg-indigo-50 aria-pressed:text-accent">{label}</button>)}
+      </nav>}
+      {visibleView === "monitor" && root && error && <p role="alert" className="rounded-md bg-amber-50 px-4 py-2 text-sm text-amber-950">扫描失败。{error}</p>}
+      {visibleView === "monitor" && root ? <Monitor {...monitor}/> : completed ? <Results report={state.report} view={visibleView as ResultView}/> : running ? <Scanning progress={progress}/> :
         <section className="flex min-h-72 grow flex-col items-center justify-center rounded-xl border border-edge bg-white px-6 py-7 text-center">
           <img src={drive} alt="" draggable={false} className="mb-4 h-[clamp(106px,25vh,248px)] max-w-full object-contain xl:h-[clamp(180px,33vh,340px)]"/>
           <h2 className="text-[clamp(21px,2.1vw,30px)] leading-tight font-semibold tracking-tight xl:text-4xl">
@@ -92,6 +104,7 @@ export function App() {
     <footer className="shrink-0 border-t border-edge bg-workspace text-xs text-muted">
       <div className="mx-auto flex min-h-10 max-w-[1600px] flex-wrap items-center gap-x-4 gap-y-1 px-5 py-2 sm:px-8 xl:min-h-13 xl:text-sm">
         <span role="status" className="flex shrink-0 items-center gap-2 font-medium"><span aria-hidden className={"size-2 rounded-full " + dot}/>{status}</span>
+        {monitor.session.phase === "active" && <span className="text-emerald-700">监控中 · {formatCount(monitor.session.total)} 条通知</span>}
         {actual && <span className="border-l border-slate-300 pl-4">实际引擎 · {engineName(actual)}</span>}
         {fallback && <span className="flex min-w-0 items-center gap-1.5" data-tip={fallback}>
           <AlertCircle size={13} aria-hidden className="shrink-0"/><span className="truncate">已自动回退。{explainError(fallback)}</span>

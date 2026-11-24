@@ -61,6 +61,17 @@ export type ScanEvent =
   | { type: "error"; message: string }
   | { type: "cancelled" };
 
+export interface MonitorChange {
+  path: string;
+  kind: "change" | "rename";
+  time: number;
+}
+
+export type MonitorEvent =
+  | { type: "ready" | "stopped"; root: string }
+  | { type: "changes"; root: string; entries: MonitorChange[]; count: number }
+  | { type: "error"; root: string; message: string };
+
 export interface DesktopApi {
   minimizeWindow(): Promise<void>;
   toggleMaximize(): Promise<void>;
@@ -71,6 +82,8 @@ export interface DesktopApi {
   startScan(root: string, engine: ScanEngine): Promise<void>;
   cancelScan(): Promise<void>;
   onScanEvent(listener: (event: ScanEvent) => void): () => void;
+  setMonitoring(root: string, enabled: boolean): Promise<void>;
+  onMonitorEvent(listener: (event: MonitorEvent) => void): () => void;
 }
 
 export const channels = {
@@ -83,6 +96,8 @@ export const channels = {
   start: "scan:start",
   cancel: "scan:cancel",
   event: "scan:event",
+  monitor: "monitor:set",
+  monitorEvent: "monitor:event",
 } as const;
 
 declare global {

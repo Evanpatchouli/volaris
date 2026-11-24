@@ -18,6 +18,7 @@ module.exports = {
   extraResources: [
     { from: "build/icon.ico", to: "icon.ico" },
     { from: "src/main/scan-process.mjs", to: "scanner/scan-process.mjs" },
+    { from: "src/main/watch-process.mjs", to: "scanner/watch-process.mjs" },
     ...scannerPackages,
   ],
   beforePack: async ({ targets }) => {

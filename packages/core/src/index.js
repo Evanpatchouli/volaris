@@ -9,6 +9,7 @@ import { LargestFiles } from "./largest-files.js";
 import { shouldIgnore, formatBytes, formatDuration } from "@volaris/shared";
 
 export { getCleanupSuggestions } from "./cleanup.js";
+export { watchDirectory } from "./watch-directory.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);

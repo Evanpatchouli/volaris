@@ -8,6 +8,8 @@ Volaris 是一个面向 Windows / NTFS 场景演进的专业磁盘空间分析�
 - Windows 上可选 `native` 引擎，通过 NTFS 主文件表（MFT）建立目录索引，后台统计指定目录或整卷的逻辑大小。
 - 两种引擎都支持目录排名、深度筛选、忽略规则、性能报告及 JSON / CSV 导出。
 
+Windows 桌面端提供空间分布图、可展开的多层目录树、最大文件榜、只读清理建议和文件系统变化监控。关闭窗口可将扫描和监控留在系统托盘中继续运行。[桌面端使用说明](packages/app/README.md)
+
 ## 项目结构
 
 ```txt
@@ -28,7 +30,7 @@ volaris/
 | `@volaris/core` | 扫描核心、Worker 线程池、任务分发 |
 | `@volaris/cli` | 命令行入口 |
 | `@volaris/native` | C++ Node-API 插件，读取 NTFS MFT 并统计目录大小 |
-| `@volaris/app` | Windows 桌面端，提供空间分布图、目录排名和扫描进度 |
+| `@volaris/app` | Windows 桌面端，提供空间分析、清理建议和目录监控 |
 
 ## 安装
 
@@ -114,10 +116,8 @@ pnpm test
 pnpm --filter @volaris/native test
 ```
 
-第一条运行引擎选择和 CLI 导出测试。第二条在 Windows 上编译并运行原生测试。在具备卷读取权限的 NTFS 环境中，先运行 `pnpm build:native`，再设置 `$env:VOLARIS_TEST_REQUIRE_NATIVE = "1"` 运行 `pnpm test`，可强制对照原生与 Worker 的扫描结果。
+第一条验证扫描、目录树、文件排名、清理建议、监控和 CLI 导出。第二条在 Windows 上编译并运行原生测试。在具备卷读取权限的 NTFS 环境中，先运行 `pnpm build:native`，再设置 `$env:VOLARIS_TEST_REQUIRE_NATIVE = "1"` 运行 `pnpm test`，可强制对照原生与 Worker 的扫描结果。
 
 ## 后续演进
 
 第三阶段后续会在相同 NTFS 卷上对照两种引擎的耗时、总字节数和文件数，以接近 WizTree / Everything 的扫描速度为优化目标。
-
-桌面端首版已提供同层目录的 TreeMap 与排名。后续功能包括多层目录树、最大文件分析、清理建议与实时监控。

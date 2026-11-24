@@ -23,6 +23,8 @@ pnpm app:dev
 
 「清理建议」从本次扫描的目录树中识别常见缓存和临时目录，并列出最大文件榜中至少 1 GiB 的文件以供核对。已经包含在候选目录中的路径只列一次。建议页为只读，所列逻辑大小与最终可释放的磁盘空间可能不同。
 
+选择目录后即可在「实时监控」中开始监听，切换视图和隐藏到托盘后继续运行。列表显示最近 100 条变化的时间与相对路径。系统会合并相邻通知，「名称变化」可能对应创建、删除或重命名。监控启动时读取该目录的 `.volarisignore`。点击「刷新分析」可按当前磁盘状态更新目录大小和文件排名。更换目录、停止监控或退出程序时关闭监听。
+
 ## 构建 Windows x64 安装包
 
 Windows x64 打包使用 Python、Visual Studio C++ 工具链和基于 OpenSSL 的 `osslsigncode`。将 `osslsigncode.exe` 加入 PATH，或在 `VOLARIS_OSSLSIGNCODE` 中指定可执行文件的绝对路径。本项目使用 osslsigncode 2.16 验证签名流程。[原生插件构建说明](../native/README.md) · [osslsigncode 官方发行包](https://github.com/mtrojnar/osslsigncode/releases)

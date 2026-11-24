@@ -1,7 +1,7 @@
 import { app, BrowserWindow, dialog, Menu, Tray, utilityProcess, type IpcMainInvokeEvent, type UtilityProcess } from "electron";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
-import { channels, type ScanEngine, type ScanEvent } from "../shared/desktop";
+import { channels, type MonitorEvent, type ScanEngine, type ScanEvent } from "../shared/desktop";
 
 let mainWindow: BrowserWindow | null = null;
 let tray: Tray | null = null;
@@ -19,9 +19,9 @@ function createWindow() {
     (!app.isPackaged && process.env.ELECTRON_RENDERER_URL) ||
     pathToFileURL(path.join(appDir, "out/renderer/index.html")).href,
   );
-  const scannerPath = app.isPackaged
-    ? path.join(process.resourcesPath, "scanner/scan-process.mjs")
-    : path.join(appDir, "src/main/scan-process.mjs");
+  const workerDir = app.isPackaged
+    ? path.join(process.resourcesPath, "scanner")
+    : path.join(appDir, "src/main");
   const win = new BrowserWindow({
     title: "Volaris",
     width: 1200,
@@ -48,6 +48,7 @@ function createWindow() {
   let generation = 0;
   let active: UtilityProcess | null = null;
   let stopping = false;
+  let monitor: UtilityProcess | null = null;
 
   function checkSender(event: IpcMainInvokeEvent) {
     const frame = event.senderFrame;
@@ -56,9 +57,16 @@ function createWindow() {
     }
   }
 
+  function stopMonitor() {
+    const child = monitor;
+    monitor = null;
+    child?.kill();
+  }
+
   function invalidate() {
     generation++;
     selectedRoot = null;
+    stopMonitor();
     const child = active;
     active = null;
     child?.kill();
@@ -110,6 +118,10 @@ function createWindow() {
       properties: ["openDirectory"],
     });
     if (current !== generation || canceled || !filePaths[0]) return null;
+    if (monitor && selectedRoot !== filePaths[0]) {
+      stopMonitor();
+      contents.send(channels.monitorEvent, { type: "stopped", root: selectedRoot });
+    }
     selectedRoot = filePaths[0];
     return selectedRoot;
   });
@@ -122,7 +134,7 @@ function createWindow() {
     }
     if (active) throw new Error("已有扫描正在进行。");
 
-    const child = utilityProcess.fork(scannerPath, [], { serviceName: "Volaris Scanner" });
+    const child = utilityProcess.fork(path.join(workerDir, "scan-process.mjs"), [], { serviceName: "Volaris Scanner" });
     active = child;
     stopping = false;
     // Keep the terminal event until exit so a subsequent scan always owns a fresh process.
@@ -155,6 +167,37 @@ function createWindow() {
       stopping = true;
       active.kill();
     }
+  });
+
+  contents.ipc.handle(channels.monitor, (event, root: unknown, enabled: unknown) => {
+    checkSender(event);
+    if (typeof root !== "string" || root !== selectedRoot) throw new Error("请先选择监控目录。");
+    if (typeof enabled !== "boolean") throw new Error("监控状态无效。");
+    if (!enabled) {
+      stopMonitor();
+      contents.send(channels.monitorEvent, { type: "stopped", root });
+      return;
+    }
+    if (monitor) return;
+
+    const child = utilityProcess.fork(path.join(workerDir, "watch-process.mjs"), [], { serviceName: "Volaris Monitor" });
+    monitor = child;
+    child.once("spawn", () => {
+      if (monitor === child) child.postMessage({ root });
+      else child.kill();
+    });
+    child.on("message", (message: MonitorEvent) => {
+      if (monitor !== child || message.root !== root) return;
+      if (message.type === "error") stopMonitor();
+      contents.send(channels.monitorEvent, message);
+    });
+    child.once("exit", (code) => {
+      if (monitor !== child) return;
+      monitor = null;
+      contents.send(channels.monitorEvent, {
+        type: "error", root, message: `监控进程意外退出（退出码 ${code}）。`,
+      });
+    });
   });
   void win.loadURL(rendererUrl.href);
   return win;

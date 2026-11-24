@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from "electron";
-import { channels, type DesktopApi, type ScanEvent } from "../shared/desktop";
+import { channels, type DesktopApi, type MonitorEvent, type ScanEvent } from "../shared/desktop";
 
 const desktop: DesktopApi = {
   minimizeWindow: () => ipcRenderer.invoke(channels.minimize),
@@ -18,6 +18,12 @@ const desktop: DesktopApi = {
     const receive = (_event: Electron.IpcRendererEvent, data: ScanEvent) => listener(data);
     ipcRenderer.on(channels.event, receive);
     return () => ipcRenderer.off(channels.event, receive);
+  },
+  setMonitoring: (root, enabled) => ipcRenderer.invoke(channels.monitor, root, enabled),
+  onMonitorEvent(listener) {
+    const receive = (_event: Electron.IpcRendererEvent, data: MonitorEvent) => listener(data);
+    ipcRenderer.on(channels.monitorEvent, receive);
+    return () => ipcRenderer.off(channels.monitorEvent, receive);
   },
 };
 

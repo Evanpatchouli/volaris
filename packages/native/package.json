@@ -5,5 +5,13 @@
   "main": "./src/index.js",
   "exports": {
     ".": "./src/index.js"
+  },
+  "scripts": {
+    "build": "node-gyp rebuild --directory cpp",
+    "test": "node-gyp rebuild --directory test && .\\test\\build\\Release\\windows_scan_test.exe && .\\test\\build\\Release\\aggregate_test.exe"
+  },
+  "devDependencies": {
+    "node-addon-api": "^8.5.0",
+    "node-gyp": "^11.5.0"
   }
 }

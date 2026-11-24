@@ -1,1 +1,3 @@
 node_modules
+/packages/native/cpp/build/
+/packages/native/test/build/

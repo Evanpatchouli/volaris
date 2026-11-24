@@ -30,6 +30,9 @@ importers:
 
   packages/core:
     dependencies:
+      '@volaris/native':
+        specifier: workspace:*
+        version: link:../native
       '@volaris/shared':
         specifier: workspace:*
         version: link:../shared

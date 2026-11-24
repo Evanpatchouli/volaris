@@ -6,6 +6,7 @@
   "type": "module",
   "scripts": {
     "build:native": "pnpm --filter @volaris/native build",
+    "test": "node --test",
     "start": "pnpm --filter @volaris/cli start",
     "scan:d": "pnpm --filter @volaris/cli scan:d",
     "scan:json": "pnpm --filter @volaris/cli scan:json",

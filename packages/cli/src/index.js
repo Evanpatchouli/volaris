@@ -7,7 +7,7 @@ import { performance } from "node:perf_hooks";
 import chalk from "chalk";
 import cliProgress from "cli-progress";
 import minimist from "minimist";
-import { scanWithWorkers } from "@volaris/core";
+import { scan } from "@volaris/core";
 import {
   csvEscape,
   formatBytes,
@@ -15,7 +15,7 @@ import {
 } from "@volaris/shared";
 
 const argv = minimist(process.argv.slice(2), {
-  string: ["path", "format", "out"],
+  string: ["path", "format", "out", "engine"],
   number: ["top", "workers", "depth"],
   boolean: ["help"],
   default: {
@@ -24,6 +24,7 @@ const argv = minimist(process.argv.slice(2), {
     workers: Math.min(os.cpus().length, 8),
     format: "table",
     depth: 1,
+    engine: "workers",
   },
 });
 
@@ -41,6 +42,7 @@ Options:
   --format    table | json | csv, default table
   --out       Output file path for json/csv
   --depth     Target depth, default 1
+  --engine    workers | native | auto, default workers
 `);
   process.exit(0);
 }
@@ -126,7 +128,8 @@ async function main() {
 
   console.log(chalk.bold("\nVolaris Disk Analyzer\n"));
   console.log(chalk.gray(`Root: ${root}`));
-  console.log(chalk.gray(`Workers: ${argv.workers}`));
+  console.log(chalk.gray(`Requested engine: ${argv.engine}`));
+  if (argv.engine === "workers") console.log(chalk.gray(`Workers: ${argv.workers}`));
   console.log(chalk.gray(`Top: ${argv.top}`));
   console.log(chalk.gray(`Depth: ${argv.depth}`));
   console.log(chalk.gray(`Ignore rules: ${ignoreRules.length}\n`));
@@ -136,12 +139,21 @@ async function main() {
   let latestMetrics = null;
   const cliStartedAt = performance.now();
 
-  const { results, summary } = await scanWithWorkers({
+  const { results, summary } = await scan({
     root,
+    engine: argv.engine,
     ignoreRules,
     depth: argv.depth,
     workers: argv.workers,
     onProgress(event) {
+      if (event.type === "native-start") {
+        console.log(chalk.gray("Starting the native NTFS scan..."));
+        return;
+      }
+      if (event.type === "fallback") {
+        console.log(chalk.yellow(`Falling back to workers (${argv.workers}): ${event.reason}`));
+        return;
+      }
       latestMetrics = event.metrics;
 
       if (!bar && event.targets) {
@@ -170,10 +182,10 @@ async function main() {
         });
       }
     },
+  }).finally(() => {
+    if (timer) clearInterval(timer);
+    if (bar) bar.stop();
   });
-
-  if (timer) clearInterval(timer);
-  if (bar) bar.stop();
 
   const top = results.slice(0, Number(argv.top));
 
@@ -203,6 +215,7 @@ async function main() {
   console.log(chalk.bold("\nPerformance Summary\n"));
 
   console.table([
+    { Metric: "Scan engine", Value: summary.engine },
     { Metric: "Elapsed", Value: summary.durationHuman },
     { Metric: "Total Size", Value: summary.totalSizeHuman },
     { Metric: "Files", Value: summary.fileCount },

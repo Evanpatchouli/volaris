@@ -1,6 +1,12 @@
 export type ScanEngine = "auto" | "workers" | "native";
 export type ActiveEngine = Exclude<ScanEngine, "auto">;
 
+export interface DirectoryNode {
+  parent: number;
+  name: string;
+  size: number;
+}
+
 export interface DirectoryResult {
   path: string;
   name: string;
@@ -9,6 +15,7 @@ export interface DirectoryResult {
   dirCount: number;
   errorCount: number;
   skippedCount: number;
+  tree?: DirectoryNode[];
 }
 
 export interface ScanReport {

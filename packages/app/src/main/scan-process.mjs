@@ -25,6 +25,7 @@ port.once("message", async ({ data: { root, engine } }) => {
       root,
       engine,
       ignoreRules,
+      includeTree: true,
       onProgress(event) {
         if (event.type === "native-start") {
           publishProgress("native");

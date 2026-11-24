@@ -84,12 +84,13 @@ struct Pending {
   std::wstring path;
   unsigned level;
   std::optional<size_t> target;
+  size_t tree_node = 0;
 };
 
 }  // namespace
 
 std::vector<Result> scan(const std::wstring& root, unsigned depth,
-                         const std::vector<std::wstring>& ignore_rules) {
+                         const std::vector<std::wstring>& ignore_rules, bool include_tree) {
   const auto volume = index_volume(root);
   const IgnoreRules ignore(ignore_rules);
   if (ignore.matches_root(root)) return {};
@@ -123,6 +124,7 @@ std::vector<Result> scan(const std::wstring& root, unsigned depth,
       continue;
     }
     if (target) ++target->dirCount;
+    uint64_t direct_bytes = 0;
     const auto prefix = ignore.normalized_prefix(current.path);
     if (current.path.back() != L'\\' && current.path.back() != L'/') current.path += L'\\';
     for (const auto& entry : entries) {
@@ -138,7 +140,7 @@ std::vector<Result> scan(const std::wstring& root, unsigned depth,
         uint64_t bytes;
         if (read_file_size(path, bytes)) {
           ++target->fileCount;
-          target->size += bytes;
+          direct_bytes += bytes;
         } else {
           ++target->errorCount;
         }
@@ -158,7 +160,27 @@ std::vector<Result> scan(const std::wstring& root, unsigned depth,
         owner = results.size();
         results.push_back({path, entry.name});
       }
-      stack.push_back({child->second, std::move(path), level, owner});
+      size_t child_node = 0;
+      if (include_tree && owner) {
+        auto& tree = results[*owner].tree;
+        child_node = tree.size();
+        const int64_t parent = target ? static_cast<int64_t>(current.tree_node) : -1;
+        tree.push_back({parent, entry.name});
+      }
+      stack.push_back({child->second, std::move(path), level, owner, child_node});
+    }
+    if (target) {
+      target->size += direct_bytes;
+      if (include_tree) target->tree[current.tree_node].size = direct_bytes;
+    }
+  }
+  if (include_tree) {
+    for (auto& row : results) {
+      // Parents enter the array first, so one reverse pass adds each subtree once.
+      for (size_t end = row.tree.size(); end > 1; --end) {
+        const auto& node = row.tree[end - 1];
+        row.tree[static_cast<size_t>(node.parent)].size += node.size;
+      }
     }
   }
   return results;

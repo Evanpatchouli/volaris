@@ -17,6 +17,8 @@ pnpm app:dev
 
 扫描从所选目录读取 `.volarisignore`。总大小为各一级子目录下文件逻辑大小之和，根目录直属文件不参与排名。文件占用为零的目录仍出现在列表中。
 
+分析结果中的「目录树」支持逐层展开。每行显示该目录及其后代的逻辑大小。目录树来自本次扫描的快照，展开时可立即查看子目录。
+
 ## 构建 Windows x64 安装包
 
 Windows x64 打包使用 Python、Visual Studio C++ 工具链和基于 OpenSSL 的 `osslsigncode`。将 `osslsigncode.exe` 加入 PATH，或在 `VOLARIS_OSSLSIGNCODE` 中指定可执行文件的绝对路径。本项目使用 osslsigncode 2.16 验证签名流程。[原生插件构建说明](../native/README.md) · [osslsigncode 官方发行包](https://github.com/mtrojnar/osslsigncode/releases)

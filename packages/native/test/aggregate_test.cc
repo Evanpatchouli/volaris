@@ -88,6 +88,7 @@ int main() {
   assert(alpha.fileCount == 3 && alpha.dirCount == 2);
   assert(alpha.errorCount == 2 && alpha.skippedCount == 7);
   assert(lookup(rows, L"empty").dirCount == 1);
+  assert(alpha.tree.empty() && lookup(rows, L"empty").tree.empty());
   assert(opened.size() == 5);
   const std::set<std::wstring> expected_files{alpha_path + L"\\file", alpha_path + L"\\hard-link",
                                               alpha_path + L"\\vanished", alpha_path + L"\\sub\\.github"};
@@ -95,13 +96,16 @@ int main() {
 
   opened.clear();
   files_queried.clear();
-  rows = scan(root, 2, rules);
+  rows = scan(root, 2, rules, true);
   assert(rows.size() == 2);
   const auto& sub = lookup(rows, L"sub");
   assert(sub.path == alpha_path + L"\\sub" && sub.size == 7);
   assert(sub.fileCount == 1 && sub.dirCount == 1 && sub.skippedCount == 2);
   const auto& blocked = lookup(rows, L"blocked");
   assert(blocked.dirCount == 0 && blocked.errorCount == 1);
+  assert(blocked.tree.size() == 1 && blocked.tree[0].name == blocked.name);
+  assert(blocked.tree[0].parent == -1 && blocked.tree[0].size == 0);
+  assert(sub.tree.size() == 1 && sub.tree[0].name == sub.name && sub.tree[0].size == sub.size);
   assert(!opened.count(root + L"\\empty"));
   assert(!opened.count(alpha_path + L"\\blocked\\unreachable"));
   assert(files_queried.size() == 1 && files_queried.count(alpha_path + L"\\sub\\.github"));
@@ -109,6 +113,31 @@ int main() {
   opened.clear();
   assert(scan(root, 1, {L"scope"}).empty());
   assert(opened.empty());
+
+  volume.directories.push_back({12, 3, L"nested"});
+  listings[alpha_path + L"\\sub"].push_back({L"nested", dir});
+  listings[alpha_path + L"\\sub\\nested"] = {{L"payload", 0}};
+  sizes[alpha_path + L"\\sub\\nested\\payload"] = 23;
+  files_queried.clear();
+  rows = scan(root, 1, rules, true);
+  const auto& with_tree = lookup(rows, L"alpha");
+  const auto& tree = with_tree.tree;
+  assert(tree.size() == 4 && tree[0].parent == -1 && tree[0].name == with_tree.name);
+  assert(tree[0].size == with_tree.size && with_tree.size == 2 * large_size + 30);
+  for (size_t i = 1; i < tree.size(); ++i) {
+    const auto& node = tree[i];
+    assert(node.parent >= 0 && static_cast<size_t>(node.parent) < i);
+    if (node.name == L"sub") {
+      assert(node.parent == 0 && node.size == 30);
+    } else if (node.name == L"nested") {
+      assert(tree[node.parent].name == L"sub" && node.size == 23);
+    } else {
+      assert(node.name == L"blocked" && node.parent == 0 && node.size == 0);
+    }
+  }
+  const auto& empty = lookup(rows, L"empty");
+  assert(empty.tree.size() == 1 && empty.tree[0].parent == -1 && empty.tree[0].size == 0);
+  assert(files_queried.size() == expected_files.size() + 1);
 
   // A non-drive-root scan whose supplied absolute path already exceeds MAX_PATH.
   std::wstring long_root = L"D:\\";

@@ -121,7 +121,7 @@ async function scanWorkerTargets(options) {
 
   const pool = new WorkerPool(workerFile, {
     size: workers,
-    workerData: { ignoreRules },
+    workerData: { ignoreRules, includeTree: options.includeTree === true },
     onStateChange(state) {
       metrics.busyWorkers = state.busyWorkers;
       metrics.idleWorkers = state.idleWorkers;
@@ -164,9 +164,9 @@ async function scanWorkerTargets(options) {
   return results;
 }
 
-async function scanNativeTargets({ root, depth, ignoreRules }) {
+async function scanNativeTargets({ root, depth, ignoreRules, includeTree }) {
   const { scanNtfsMft } = await import("@volaris/native");
-  return scanNtfsMft({ root, depth: normalizeDepth(depth), ignoreRules });
+  return scanNtfsMft({ root, depth: normalizeDepth(depth), ignoreRules, includeTree: includeTree === true });
 }
 
 export async function scan(options) {

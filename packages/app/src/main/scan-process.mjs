@@ -1,4 +1,4 @@
-import { scan } from "@volaris/core";
+import { getCleanupSuggestions, scan } from "@volaris/core";
 import { loadIgnoreRules } from "@volaris/shared";
 
 const port = process.parentPort;
@@ -42,6 +42,7 @@ port.once("message", async ({ data: { root, engine } }) => {
         }
       },
     });
+    report.cleanupSuggestions = getCleanupSuggestions(report);
     port.postMessage({ type: "complete", report });
   } catch (error) {
     port.postMessage({ type: "error", message: error instanceof Error ? error.message : String(error) });

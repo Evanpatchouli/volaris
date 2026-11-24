@@ -5,6 +5,7 @@ import { colorFor, formatCount, formatDuration, formatSize } from "./presentatio
 import { Treemap } from "./Treemap";
 import { DirectoryTree } from "./DirectoryTree";
 import { LargestFiles } from "./LargestFiles";
+import { Cleanup } from "./Cleanup";
 
 export function Metrics({ size, files, dirs, duration }: {
   size?: number; files?: number; dirs?: number; duration?: number;
@@ -87,7 +88,7 @@ export function Results({ report }: { report: ScanReport }) {
   const { results, summary } = report;
   const [index, setIndex] = useState(0);
   const [page, setPage] = useState(0);
-  const [view, setView] = useState<"overview" | "tree" | "files">("overview");
+  const [view, setView] = useState<"overview" | "tree" | "files" | "cleanup">("overview");
   function select(rank: number) {
     if (rank < 0) return;
     setIndex(rank);
@@ -96,11 +97,12 @@ export function Results({ report }: { report: ScanReport }) {
   return <>
     <Metrics size={summary.totalSizeBytes} files={summary.fileCount} dirs={summary.dirCount} duration={summary.durationMs} />
     <nav aria-label="分析视图" className="flex shrink-0 flex-wrap gap-1 rounded-lg border border-edge bg-white p-1 self-start">
-      {([["overview", "空间概览"], ["tree", "目录树"], ["files", "最大文件"]] as const).map(([id, label]) =>
+      {([["overview", "空间概览"], ["tree", "目录树"], ["files", "最大文件"], ["cleanup", "清理建议"]] as const).map(([id, label]) =>
         <button key={id} type="button" aria-pressed={view === id} onClick={() => setView(id)} className="cursor-pointer rounded-md px-4 py-1.5 text-sm font-medium text-muted hover:bg-workspace focus-visible:outline-accent aria-pressed:bg-indigo-50 aria-pressed:text-accent">{label}</button>)}
     </nav>
     {view === "tree" && <DirectoryTree rows={results}/>}
     {view === "files" && <LargestFiles report={report}/>}
+    {view === "cleanup" && <Cleanup suggestions={report.cleanupSuggestions ?? []}/>}
     {view === "overview" && <div className="grid min-h-0 grow gap-4 md:grid-cols-[minmax(0,1.48fr)_minmax(315px,1fr)] md:grid-rows-[minmax(325px,1fr)]">
       <section className="flex min-h-80 min-w-0 flex-col rounded-xl border border-edge bg-white" aria-labelledby="map-heading">
         <h2 id="map-heading" className="flex items-center gap-2.5 px-5 pt-5 pb-4 text-lg font-semibold xl:text-2xl">

@@ -20,6 +20,7 @@ export interface DirectoryResult {
 
 export interface ScanReport {
   results: DirectoryResult[];
+  cleanupSuggestions?: CleanupSuggestion[];
   largestFiles?: Array<{ path: string; name: string; size: number }>;
   largestFileReadErrors?: number;
   summary: {
@@ -34,6 +35,13 @@ export interface ScanReport {
     errorCount: number;
     skippedCount: number;
   };
+}
+
+export interface CleanupSuggestion {
+  path: string;
+  name: string;
+  size: number;
+  kind: "cache" | "temporary" | "large-file";
 }
 
 export interface ScanProgress {

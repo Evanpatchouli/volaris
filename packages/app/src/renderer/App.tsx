@@ -1,8 +1,10 @@
 import { useEffect, useState } from "react";
-import { AlertCircle, ChevronDown, Folder, FolderOpen, LoaderCircle, Play, Square } from "lucide-react";
-import type { ScanEngine, ScanProgress } from "../shared/desktop";
+import { AlertCircle, Folder, FolderOpen, LoaderCircle, Play, Square } from "lucide-react";
+import type { ScanProgress } from "../shared/desktop";
 import drive from "./assets/drive.webp";
-import logo from "./assets/volaris.png";
+import { AppBar } from "./AppBar";
+import { Tooltip } from "./Tooltip";
+import { EnginePicker } from "./EnginePicker";
 import { engineName, explainError, formatCount } from "./presentation";
 import { Metrics, Results } from "./Results";
 import { useScan } from "./useScan";
@@ -30,7 +32,12 @@ function Scanning({ progress }: { progress?: ScanProgress }) {
       <p className="text-sm text-muted">{measurable
         ? "已完成 " + formatCount(progress.completedTargets) + " / " + formatCount(targets) + " 个目标目录"
         : progress?.engine === "native" ? "正在读取 NTFS 元数据…" : "正在准备扫描目标…"}</p>
-      {measurable && <progress className="h-1.5 w-64 max-w-full accent-accent" value={progress.completedTargets} max={targets} aria-label="已扫描目标目录"/>}
+      {measurable && <div role="progressbar" aria-label="已扫描目标目录" aria-valuemin={0}
+        aria-valuemax={targets} aria-valuenow={progress.completedTargets}
+        className="h-1.5 w-64 max-w-full overflow-hidden rounded-full bg-indigo-100">
+        <div className="h-full rounded-full bg-accent transition-[width] duration-200 motion-reduce:transition-none"
+          style={{ width: Math.min(100, 100 * progress.completedTargets / targets) + "%" }}/>
+      </div>}
     </section>
   </>;
 }
@@ -51,30 +58,17 @@ export function App() {
   const dot = running ? "bg-indigo-500" : completed ? "bg-emerald-500" : error ? "bg-rose-500" : "bg-slate-400";
 
   return <div className="flex min-h-dvh flex-col bg-workspace font-sans text-ink antialiased md:h-dvh md:min-h-[510px]">
-    <header className="shrink-0 border-b border-edge bg-white">
-      <div className="mx-auto flex h-14 w-full max-w-[1600px] items-center gap-4 px-5 sm:h-16 sm:px-8 xl:h-[70px] xl:gap-5">
-        <div className="flex items-center gap-2.5"><img src={logo} alt="" className="size-8"/>
-          <span className="text-[25px] leading-none font-bold tracking-[-0.045em] xl:text-[32px]">Volaris</span></div>
-        <span aria-hidden className="h-5 w-px bg-slate-300"/>
-        <span className="text-[15px] font-medium tracking-wide text-muted xl:text-lg">磁盘空间分析</span>
-      </div>
-    </header>
+    <AppBar/>
+    <Tooltip/>
     <main className="mx-auto flex w-full max-w-[1600px] grow flex-col gap-5 px-5 pt-6 pb-5 sm:px-8 md:min-h-0 md:overflow-y-auto lg:gap-6 lg:pt-8">
       <div className="flex shrink-0 flex-wrap items-center justify-between gap-x-4 gap-y-3">
         <div className="min-w-0 flex-[1_1_150px]">
           <h1 className="text-[28px] leading-tight font-bold tracking-tight lg:text-[32px] xl:text-[40px]">扫描概览</h1>
-          <p className={"mt-1 truncate text-sm text-muted xl:text-lg " + (root ? "font-mono" : "")} title={root}>{root || "尚未选择目录"}</p>
+          <p className={"mt-1 truncate text-sm text-muted xl:text-lg " + (root ? "font-mono" : "")} data-tip={root}>{root || "尚未选择目录"}</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {root && <button type="button" className={secondary} disabled={running || choosing} onClick={choose}><Folder size={16}/>选择目录</button>}
-          <label className="relative flex">
-            <select aria-label="扫描引擎" value={engine} disabled={running || choosing}
-              onChange={(event) => setEngine(event.target.value as ScanEngine)}
-              className={secondary + " appearance-none pr-9 xl:pr-10"}>
-              <option value="auto">自动引擎</option><option value="workers">Worker 引擎</option><option value="native">NTFS 引擎</option>
-            </select>
-            <ChevronDown aria-hidden size={15} className="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 text-muted"/>
-          </label>
+          <EnginePicker value={engine} disabled={running || choosing} onChange={setEngine} className={secondary}/>
           {completed && <button type="button" onClick={start} disabled={choosing} className={primary}><Play aria-hidden size={15} fill="currentColor"/>开始扫描</button>}
           {running && <button type="button" onClick={cancel} disabled={cancelling} className={secondary}><Square size={13}/>{cancelling ? "正在取消" : "取消扫描"}</button>}
         </div>
@@ -85,7 +79,7 @@ export function App() {
           <h2 className="text-[clamp(21px,2.1vw,30px)] leading-tight font-semibold tracking-tight xl:text-4xl">
             {error ? "扫描遇到问题" : !root ? "从一个目录开始" : state.phase === "cancelled" ? "扫描已取消" : "准备扫描"}
           </h2>
-          <p className="mt-2.5 max-w-xl text-[15px] leading-relaxed break-words text-muted xl:mt-4 xl:text-lg" role={error ? "alert" : undefined} title={state.phase === "error" ? state.message : undefined}>
+          <p className="mt-2.5 max-w-xl text-[15px] leading-relaxed break-words text-muted xl:mt-4 xl:text-lg" role={error ? "alert" : undefined} data-tip={state.phase === "error" ? state.message : undefined}>
             {error ?? (!root ? "选择磁盘或文件夹，查看子目录占用的空间。" : "统计所选目录下各个子目录的大小与文件数。")}
             {state.phase === "error" && error !== state.message && engine === "native" && "可切换到自动引擎后重试。"}
           </p>
@@ -99,7 +93,7 @@ export function App() {
       <div className="mx-auto flex min-h-10 max-w-[1600px] flex-wrap items-center gap-x-4 gap-y-1 px-5 py-2 sm:px-8 xl:min-h-13 xl:text-sm">
         <span role="status" className="flex shrink-0 items-center gap-2 font-medium"><span aria-hidden className={"size-2 rounded-full " + dot}/>{status}</span>
         {actual && <span className="border-l border-slate-300 pl-4">实际引擎 · {engineName(actual)}</span>}
-        {fallback && <span className="flex min-w-0 items-center gap-1.5" title={fallback}>
+        {fallback && <span className="flex min-w-0 items-center gap-1.5" data-tip={fallback}>
           <AlertCircle size={13} aria-hidden className="shrink-0"/><span className="truncate">已自动回退。{explainError(fallback)}</span>
         </span>}
         {summary && (summary.errorCount > 0 || summary.skippedCount > 0) && <span className="ml-auto">读取错误 {formatCount(summary.errorCount)} · 跳过 {formatCount(summary.skippedCount)}</span>}

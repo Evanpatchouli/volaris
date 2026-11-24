@@ -45,6 +45,11 @@ export type ScanEvent =
   | { type: "cancelled" };
 
 export interface DesktopApi {
+  minimizeWindow(): Promise<void>;
+  toggleMaximize(): Promise<void>;
+  isWindowMaximized(): Promise<boolean>;
+  onMaximizedChange(listener: (maximized: boolean) => void): () => void;
+  hideToTray(): Promise<void>;
   chooseDirectory(): Promise<string | null>;
   startScan(root: string, engine: ScanEngine): Promise<void>;
   cancelScan(): Promise<void>;
@@ -52,6 +57,11 @@ export interface DesktopApi {
 }
 
 export const channels = {
+  minimize: "window:minimize",
+  toggleMaximize: "window:toggle-maximize",
+  isMaximized: "window:is-maximized",
+  maximizedChange: "window:maximized-change",
+  hide: "window:hide-to-tray",
   choose: "scan:choose-directory",
   start: "scan:start",
   cancel: "scan:cancel",

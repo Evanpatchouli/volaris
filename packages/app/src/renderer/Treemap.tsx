@@ -162,7 +162,7 @@ export function Treemap({ rows, selected, onSelect }: TreemapProps) {
         onMouseMove={event => {
           const tile = targetAt(event);
           const title = tile ? `${tile.row.path} · ${formatSize(tile.row.size)}` : "";
-          if (event.currentTarget.title !== title) event.currentTarget.title = title;
+          if (event.currentTarget.dataset.tip !== title) event.currentTarget.dataset.tip = title;
         }}
         onClick={event => {
           const tile = targetAt(event);

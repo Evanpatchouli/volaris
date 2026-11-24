@@ -15,7 +15,7 @@ export function Metrics({ size, files, dirs, duration }: {
   ];
   return <dl className="grid shrink-0 grid-cols-2 gap-y-5 rounded-xl border border-edge bg-white px-1 py-5 sm:grid-cols-4 sm:py-6 xl:py-7">
     {metrics.map(([label, value, hint], i) => (
-      <div key={label} className={'min-w-0 px-4 sm:px-6 ' + (i ? 'sm:border-l sm:border-edge' : '')} title={hint}>
+      <div key={label} className={'min-w-0 px-4 sm:px-6 ' + (i ? 'sm:border-l sm:border-edge' : '')} data-tip={hint}>
         <dt className="mb-1.5 text-sm font-medium text-muted xl:text-lg">{label}</dt>
         <dd className="truncate text-2xl leading-tight font-semibold tracking-tight tabular-nums lg:text-3xl xl:text-[40px]">{value}</dd>
       </div>
@@ -57,7 +57,7 @@ function Ranking({ rows, total, index, onSelect, page, onPage }: {
       <div className="mx-3 min-h-0 flex-1 overflow-y-auto overscroll-contain py-1" ref={list} aria-label="按大小排序的目录">
         {rows.slice(start, start + pageSize).map((row, offset) => {
           const rank = start + offset;
-          return <button key={row.path} type="button" aria-pressed={rank === index} title={row.path} onClick={() => onSelect(rank)}
+          return <button key={row.path} type="button" aria-pressed={rank === index} data-tip={row.path} onClick={() => onSelect(rank)}
             className="grid w-full cursor-pointer grid-cols-[2rem_minmax(0,1fr)_5rem_3.6rem] items-center gap-1 rounded-md border-b border-slate-100 px-2 py-2.5 text-left text-sm hover:bg-workspace focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent aria-pressed:border-transparent aria-pressed:bg-indigo-50 xl:text-base">
             <span className="text-xs text-muted tabular-nums">{rank + 1}</span>
             <span className="flex min-w-0 items-center gap-2 font-medium">
@@ -73,7 +73,7 @@ function Ranking({ rows, total, index, onSelect, page, onPage }: {
         {page + 1} / {pages}
         <button className={pageButton} type="button" disabled={page + 1 >= pages} aria-label="下一页" onClick={() => onPage(page + 1)}><ChevronRight size={16}/></button>
       </div>}
-      {item && <div className="flex items-center gap-2 border-t border-edge px-5 py-3 text-xs text-muted" title={item.path}>
+      {item && <div className="flex items-center gap-2 border-t border-edge px-5 py-3 text-xs text-muted" data-tip={item.path}>
         <FolderOpen size={15} className="shrink-0"/><span className="truncate font-semibold text-ink">{item.name}</span>
         <span className="ml-auto shrink-0">{formatCount(item.fileCount)} 个文件 · {formatCount(item.dirCount)} 个目录</span>
       </div>}

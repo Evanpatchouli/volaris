@@ -1,7 +1,17 @@
-import { app, BrowserWindow, dialog, utilityProcess, type IpcMainInvokeEvent, type UtilityProcess } from "electron";
+import { app, BrowserWindow, dialog, Menu, Tray, utilityProcess, type IpcMainInvokeEvent, type UtilityProcess } from "electron";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { channels, type ScanEngine, type ScanEvent } from "../shared/desktop";
+
+let mainWindow: BrowserWindow | null = null;
+let tray: Tray | null = null;
+let quitting = false;
+
+function iconPath() {
+  return app.isPackaged
+    ? path.join(process.resourcesPath, "icon.ico")
+    : path.join(app.getAppPath(), "build/icon.ico");
+}
 
 function createWindow() {
   const appDir = app.getAppPath();
@@ -18,6 +28,9 @@ function createWindow() {
     height: 800,
     minWidth: 800,
     minHeight: 580,
+    frame: false,
+    resizable: true,
+    icon: iconPath(),
     autoHideMenuBar: true,
     webPreferences: {
       preload: path.join(appDir, "out/preload/index.cjs"),
@@ -39,7 +52,7 @@ function createWindow() {
   function checkSender(event: IpcMainInvokeEvent) {
     const frame = event.senderFrame;
     if (!frame || frame !== contents.mainFrame || frame.url.split("#")[0] !== rendererUrl.href) {
-      throw new Error("无法从此页面操作扫描任务。");
+      throw new Error("无法从此页面操作桌面窗口。");
     }
   }
 
@@ -52,7 +65,42 @@ function createWindow() {
   }
   contents.on("did-start-loading", invalidate);
   contents.on("render-process-gone", invalidate);
-  win.on("closed", invalidate);
+  win.on("closed", () => {
+    invalidate();
+    mainWindow = null;
+  });
+  win.on("close", (event) => {
+    if (!quitting) {
+      event.preventDefault();
+      win.hide();
+    }
+  });
+  win.on("session-end", () => {
+    // Windows can end the session without emitting app's before-quit event.
+    quitting = true;
+    invalidate();
+    app.quit();
+  });
+  win.on("maximize", () => contents.send(channels.maximizedChange, true));
+  win.on("unmaximize", () => contents.send(channels.maximizedChange, false));
+
+  contents.ipc.handle(channels.minimize, (event) => {
+    checkSender(event);
+    win.minimize();
+  });
+  contents.ipc.handle(channels.toggleMaximize, (event) => {
+    checkSender(event);
+    if (win.isMaximized()) win.unmaximize();
+    else win.maximize();
+  });
+  contents.ipc.handle(channels.isMaximized, (event) => {
+    checkSender(event);
+    return win.isMaximized();
+  });
+  contents.ipc.handle(channels.hide, (event) => {
+    checkSender(event);
+    win.hide();
+  });
 
   contents.ipc.handle(channels.choose, async (event) => {
     checkSender(event);
@@ -109,14 +157,36 @@ function createWindow() {
     }
   });
   void win.loadURL(rendererUrl.href);
+  return win;
 }
 
-app.whenReady().then(() => {
-  createWindow();
-  app.on("activate", () => {
-    if (!BrowserWindow.getAllWindows().length) createWindow();
+function showMainWindow() {
+  if (quitting) return;
+  mainWindow ??= createWindow();
+  if (mainWindow.isMinimized()) mainWindow.restore();
+  mainWindow.show();
+  mainWindow.focus();
+}
+
+if (!app.requestSingleInstanceLock()) {
+  app.quit();
+} else {
+  app.on("second-instance", showMainWindow);
+  app.on("activate", showMainWindow);
+  app.on("before-quit", () => { quitting = true; });
+  app.on("will-quit", () => {
+    tray?.destroy();
+    tray = null;
   });
-});
-app.on("window-all-closed", () => {
-  if (process.platform !== "darwin") app.quit();
-});
+  app.whenReady().then(() => {
+    tray = new Tray(iconPath());
+    tray.setToolTip("Volaris");
+    tray.setContextMenu(Menu.buildFromTemplate([
+      { label: "打开", click: showMainWindow },
+      { type: "separator" },
+      { label: "退出", click: () => app.quit() },
+    ]));
+    tray.on("click", showMainWindow);
+    showMainWindow();
+  });
+}

@@ -16,6 +16,7 @@ module.exports = {
   files: ["out/**/*", "package.json"],
   // Physical paths let ESM workers and the native addon resolve without ASAR shims.
   extraResources: [
+    { from: "build/icon.ico", to: "icon.ico" },
     { from: "src/main/scan-process.mjs", to: "scanner/scan-process.mjs" },
     ...scannerPackages,
   ],

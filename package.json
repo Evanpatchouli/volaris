@@ -5,6 +5,10 @@
   "description": "Volaris monorepo: high-performance disk analyzer.",
   "type": "module",
   "scripts": {
+    "app:dev": "pnpm --filter @volaris/app run dev",
+    "app:build": "pnpm --filter @volaris/app run build",
+    "app:pack": "pnpm --filter @volaris/app run pack",
+    "app:dist": "pnpm --filter @volaris/app run dist",
     "build:native": "pnpm --filter @volaris/native build",
     "test": "node --test",
     "start": "pnpm --filter @volaris/cli start",

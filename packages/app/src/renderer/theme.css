@@ -1,0 +1,11 @@
+@import "tailwindcss" source("./");
+
+@theme {
+  --font-sans: Inter, "Segoe UI Variable", "Segoe UI", "Microsoft YaHei UI", sans-serif;
+  --font-mono: "Cascadia Code", Consolas, monospace;
+  --color-ink: #151a2c;
+  --color-muted: #586478;
+  --color-edge: #d9dfea;
+  --color-workspace: #f5f7fb;
+  --color-accent: #3648dc;
+}

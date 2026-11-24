@@ -85,28 +85,37 @@ struct Fixture {
 
 void test_volume_io() {
   Fixture fixture;
-  fs::create_directory(fixture.root / L"empty");
-  auto file = fixture.root / unicode_name;
-  std::ofstream(file, std::ios::binary) << "abc123";
-  fs::create_hard_link(file, fixture.root / L"link");
+  const auto root = fixture.root / L"scan";
+  fs::create_directories(root / L"empty");
+  const auto file = root / unicode_name;
+  const auto outside = fixture.root / L"outside-link";
+  std::ofstream(file, std::ios::binary) << "abc";
+  fs::create_hard_link(file, root / L"link");
+  fs::create_hard_link(file, outside);
+  std::ofstream(outside, std::ios::binary | std::ios::app) << "123456";
 
   std::vector<Entry> entries;
-  require(read_directory(fixture.root.wstring(), entries) && entries.size() == 3, "Wrong directory listing.");
+  require(read_directory(root.wstring(), entries) && entries.size() == 3, "Wrong directory listing.");
+  uint64_t bytes = 0;
   for (const auto& entry : entries) {
     if (entry.name == L"empty") {
       require(entry.attributes & FILE_ATTRIBUTE_DIRECTORY, "Missing directory attribute.");
     } else {
-      require((entry.name == unicode_name || entry.name == L"link") && entry.size == 6, "Wrong file size or name.");
+      require(entry.name == unicode_name || entry.name == L"link", "Wrong file name.");
+      require(read_file_size((root / entry.name).wstring(), bytes) && bytes == 9, "Stale hard link length.");
     }
   }
-  require(read_directory((fixture.root / L"empty").wstring(), entries) && entries.empty(), "Wrong empty listing.");
-  require(!read_directory((fixture.root / L"gone").wstring(), entries), "Missing directory reported as readable.");
+  require(read_file_size(outside.wstring(), bytes) && bytes == 9, "Wrong size through the external link.");
+  require(!read_file_size((root / L"empty").wstring(), bytes), "Directory counted as a regular file.");
+  require(!read_file_size((root / L"gone").wstring(), bytes), "Missing file reported as readable.");
+  require(read_directory((root / L"empty").wstring(), entries) && entries.empty(), "Wrong empty listing.");
+  require(!read_directory((root / L"gone").wstring(), entries), "Missing directory reported as readable.");
 
   expect_error("ERR_NTFS_SCAN", [&] { index_volume(file.wstring()); });
   expect_error("ERR_NTFS_SCAN", [&] { index_volume((fixture.root / L"gone").wstring()); });
   expect_error("ERR_NTFS_UNAVAILABLE", [&] { index_volume(L"\\\\server\\share\\dir"); });
   try {
-    auto index = index_volume(fixture.root.wstring());
+    auto index = index_volume(root.wstring());
     require(std::any_of(index.directories.begin(), index.directories.end(), [&](const DirectoryRecord& item) {
       return item.parent == index.root_id && item.name == L"empty";
     }), "MFT volume index did not find the new child directory by parent ID.");

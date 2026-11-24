@@ -182,12 +182,28 @@ bool read_directory(const std::wstring& path, std::vector<Entry>& entries) {
   if (search.value == INVALID_HANDLE_VALUE) return GetLastError() == ERROR_FILE_NOT_FOUND;
   do {
     if (std::wcscmp(data.cFileName, L".") == 0 || std::wcscmp(data.cFileName, L"..") == 0) continue;
-    entries.push_back({data.cFileName, data.dwFileAttributes,
-                       (static_cast<uint64_t>(data.nFileSizeHigh) << 32) | data.nFileSizeLow});
+    entries.push_back({data.cFileName, data.dwFileAttributes});
   } while (FindNextFileW(search.value, &data));
   if (GetLastError() == ERROR_NO_MORE_FILES) return true;
   entries.clear();
   return false;
+}
+
+bool read_file_size(const std::wstring& path, uint64_t& bytes) {
+  // NTFS can retain an old length in a directory entry after a write through
+  // another hard link. Read EOF from the file itself without following a link
+  // that might have replaced this entry since enumeration.
+  Handle file(CreateFileW(extended_path(path).c_str(), FILE_READ_ATTRIBUTES, share_all, nullptr,
+                          OPEN_EXISTING, FILE_FLAG_OPEN_REPARSE_POINT, nullptr), CloseHandle);
+  if (file.value == INVALID_HANDLE_VALUE) return false;
+  FILE_ATTRIBUTE_TAG_INFO tag{};
+  if (!GetFileInformationByHandleEx(file.value, FileAttributeTagInfo, &tag, sizeof(tag)) ||
+      (tag.FileAttributes & (FILE_ATTRIBUTE_REPARSE_POINT | FILE_ATTRIBUTE_DIRECTORY))) return false;
+  FILE_STANDARD_INFO standard{};
+  if (!GetFileInformationByHandleEx(file.value, FileStandardInfo, &standard, sizeof(standard)) ||
+      standard.EndOfFile.QuadPart < 0) return false;
+  bytes = static_cast<uint64_t>(standard.EndOfFile.QuadPart);
+  return true;
 }
 
 }  // namespace volaris

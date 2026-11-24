@@ -30,11 +30,11 @@ struct VolumeIndex {
 struct Entry {
   std::wstring name;
   uint32_t attributes;
-  uint64_t size;
 };
 
 VolumeIndex index_volume(const std::wstring& root);
 bool read_directory(const std::wstring& path, std::vector<Entry>& entries);
+bool read_file_size(const std::wstring& path, uint64_t& bytes);
 
 // Parse one FSCTL_ENUM_USN_DATA output buffer and return its continuation cursor.
 uint64_t append_mft_batch(const unsigned char* bytes, std::size_t count, uint64_t cursor,

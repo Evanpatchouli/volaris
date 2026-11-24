@@ -33,7 +33,8 @@ node packages/app/scripts/check-package.mjs
 
 ```powershell
 $signTool = if ($env:VOLARIS_OSSLSIGNCODE) { $env:VOLARIS_OSSLSIGNCODE } else { "osslsigncode" }
-$installer = Get-Item packages/app/release/Volaris-0.1.0-win-x64-setup.exe
+$appVersion = node -p "require('./packages/app/package.json').version"
+$installer = Get-Item "packages/app/release/Volaris-$appVersion-win-x64-setup.exe"
 & $signTool verify -CAfile packages/app/release/volaris-development.pem -in $installer.FullName
 ```
 

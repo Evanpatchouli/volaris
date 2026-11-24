@@ -1,0 +1,65 @@
+export type ScanEngine = "auto" | "workers" | "native";
+export type ActiveEngine = Exclude<ScanEngine, "auto">;
+
+export interface DirectoryResult {
+  path: string;
+  name: string;
+  size: number;
+  fileCount: number;
+  dirCount: number;
+  errorCount: number;
+  skippedCount: number;
+}
+
+export interface ScanReport {
+  results: DirectoryResult[];
+  summary: {
+    root: string;
+    engine: ActiveEngine;
+    fallbackReason?: string;
+    targets: number;
+    durationMs: number;
+    totalSizeBytes: number;
+    fileCount: number;
+    dirCount: number;
+    errorCount: number;
+    skippedCount: number;
+  };
+}
+
+export interface ScanProgress {
+  type: "progress";
+  engine: ActiveEngine;
+  completedTargets: number;
+  totalTargets: number | null;
+  totalSizeBytes: number;
+  fileCount: number;
+  dirCount: number;
+  fallbackReason?: string;
+}
+
+export type ScanEvent =
+  | ScanProgress
+  | { type: "complete"; report: ScanReport }
+  | { type: "error"; message: string }
+  | { type: "cancelled" };
+
+export interface DesktopApi {
+  chooseDirectory(): Promise<string | null>;
+  startScan(root: string, engine: ScanEngine): Promise<void>;
+  cancelScan(): Promise<void>;
+  onScanEvent(listener: (event: ScanEvent) => void): () => void;
+}
+
+export const channels = {
+  choose: "scan:choose-directory",
+  start: "scan:start",
+  cancel: "scan:cancel",
+  event: "scan:event",
+} as const;
+
+declare global {
+  interface Window {
+    volaris: DesktopApi;
+  }
+}

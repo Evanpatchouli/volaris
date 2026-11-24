@@ -1,6 +1,6 @@
 {
   "name": "@volaris/app",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "private": true,
   "type": "module",
   "description": "Volaris Windows 磁盘空间分析桌面端",
